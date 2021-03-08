@@ -117,8 +117,8 @@ instance rangeOfLabeled :: (RangeOf a, RangeOf b) => RangeOf (Labeled a b) where
     }
 
 instance tokensOfLabeled :: (TokensOf a, TokensOf b) => TokensOf (Labeled a b) where
-  tokensOf (Labeled { label, value }) =
-    tokensOf label <> tokensOf value
+  tokensOf (Labeled { label, separator, value }) =
+    tokensOf label <> TokenList.singleton separator <> tokensOf value
 
 instance rangeOfOneOrDelimited :: RangeOf a => RangeOf (OneOrDelimited a) where
   rangeOf = case _ of
