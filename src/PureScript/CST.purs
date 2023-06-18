@@ -32,6 +32,7 @@ import PureScript.CST.Range (class TokensOf, tokensOf)
 import PureScript.CST.Range.TokenList as TokenList
 import PureScript.CST.Types (Binder, Declaration, Expr, ImportDecl, Module(..), ModuleHeader, Type)
 import Unsafe.Coerce (unsafeCoerce)
+import Effect.Aff (Aff)
 
 data RecoveredParserResult f
   = ParseSucceeded (f Void)
@@ -54,25 +55,25 @@ toRecoveredParserResult = case _ of
 toRecovered :: forall f. f Void -> Recovered f
 toRecovered = unsafeCoerce
 
-runRecoveredParser :: forall a. Parser (Recovered a) -> String -> RecoveredParserResult a
-runRecoveredParser p = toRecoveredParserResult <<< flip runParser p <<< lex
+runRecoveredParser :: forall a. Parser (Recovered a) -> String -> Aff (RecoveredParserResult a)
+runRecoveredParser p = map toRecoveredParserResult <<< flip runParser p <<< lex
 
-parseModule :: String -> RecoveredParserResult Module
+parseModule :: String -> Aff (RecoveredParserResult Module)
 parseModule = runRecoveredParser Parser.parseModule
 
-parseImportDecl :: String -> RecoveredParserResult ImportDecl
+parseImportDecl :: String -> Aff (RecoveredParserResult ImportDecl)
 parseImportDecl = runRecoveredParser Parser.parseImportDecl
 
-parseDecl :: String -> RecoveredParserResult Declaration
+parseDecl :: String -> Aff (RecoveredParserResult Declaration)
 parseDecl = runRecoveredParser Parser.parseDecl
 
-parseExpr :: String -> RecoveredParserResult Expr
+parseExpr :: String -> Aff (RecoveredParserResult Expr)
 parseExpr = runRecoveredParser Parser.parseExpr
 
-parseType :: String -> RecoveredParserResult Type
+parseType :: String -> Aff (RecoveredParserResult Type)
 parseType = runRecoveredParser Parser.parseType
 
-parseBinder :: String -> RecoveredParserResult Binder
+parseBinder :: String -> Aff (RecoveredParserResult Binder)
 parseBinder = runRecoveredParser Parser.parseBinder
 
 newtype PartialModule e = PartialModule
@@ -80,21 +81,24 @@ newtype PartialModule e = PartialModule
   , full :: Z.Lazy (RecoveredParserResult Module)
   }
 
-parsePartialModule :: String -> RecoveredParserResult PartialModule
+parsePartialModule :: String -> Aff (RecoveredParserResult PartialModule)
 parsePartialModule src =
-  toRecoveredParserResult $ case runParser' (initialParserState (lex src)) parseModuleHeader of
-    ParseSucc header state -> do
-      let
-        res = PartialModule
-          { header
-          , full: Z.defer \_ ->
-              toRecoveredParserResult $ fromParserResult $ runParser' state do
-                body <- parseModuleBody
-                pure $ Module { header, body }
-          }
-      Right $ Tuple res state.errors
-    ParseFail error _ ->
-      Left error
+  toRecoveredParserResult <$> do
+    parsed <- runParser' (initialParserState (lex src)) parseModuleHeader
+    case parsed of
+      ParseSucc header state -> do
+        partial <- runParser' state do
+          body <- parseModuleBody
+          pure $ Module { header, body }
+        let
+          res = PartialModule
+            { header
+            , full: Z.defer \_ ->
+                toRecoveredParserResult $ fromParserResult $ partial
+            }
+        pure $ Right $ Tuple res state.errors
+      ParseFail error _ ->
+        pure $ Left error
 
 printModule :: forall e. TokensOf e => Module e -> String
 printModule mod =

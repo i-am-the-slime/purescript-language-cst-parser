@@ -14,9 +14,11 @@ import Effect.Class.Console as Console
 import Node.Process as Process
 import PureScript.CST (RecoveredParserResult(..), parseBinder, parseDecl, parseExpr, parseModule, parseType)
 import PureScript.CST.Types (AppSpine(..), Binder, Declaration(..), DoStatement(..), Expr(..), Label(..), Labeled(..), LetBinding(..), Module(..), ModuleBody(..), Name(..), Prefixed(..), RecordLabeled(..), Separated(..), Token(..), Type(..), TypeVarBinding(..), Wrapped(..))
+import Effect.Aff (Aff, launchAff_)
+import Effect.Class (liftEffect)
 
 class ParseFor f where
-  parseFor :: String -> RecoveredParserResult f
+  parseFor :: String -> Aff (RecoveredParserResult f)
 
 instance ParseFor Module where
   parseFor = parseModule
@@ -39,10 +41,10 @@ assertParse
   => String
   -> String
   -> (RecoveredParserResult f -> Boolean)
-  -> Effect Unit
+  -> Aff Unit
 assertParse name src k = do
-  let res = parseFor (trim src)
-  unless (k res) do
+  res <- parseFor (trim src)
+  unless (k res) $ liftEffect $ do
     Console.error $ "Assertion failed: " <> name
     Process.exit 1
   where
@@ -59,7 +61,7 @@ assertParse name src k = do
       >>> String.joinWith "\n"
 
 main :: Effect Unit
-main = do
+main = launchAff_ do
   assertParse "Recovered do statements"
     """
     do

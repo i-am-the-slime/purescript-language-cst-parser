@@ -32,6 +32,9 @@ import PureScript.CST.Errors (ParseError(..))
 import PureScript.CST.TokenStream (TokenStep(..), TokenStream)
 import PureScript.CST.TokenStream as TokenStream
 import PureScript.CST.Types (Comment, LineFeed, SourcePos, SourceToken)
+import Data.Time.Duration (Milliseconds(Milliseconds))
+import Effect.Aff (Aff)
+import Effect.Aff (delay) as Aff
 
 type PositionedError =
   { position :: SourcePos
@@ -232,18 +235,26 @@ optional p = Just <$> p <|> pure Nothing
 
 data Trampoline a = More (Unit -> Trampoline a) | Done a
 
-runParser' :: forall a. ParserState -> Parser a -> ParserResult a
+runParser' :: forall a. ParserState -> Parser a -> Aff (ParserResult a)
 runParser' state1 (Parser p) =
-  run $ runFn4 p state1 More
+  run 0 $ runFn4 p state1 More
     (mkFn2 \state2 error -> Done (ParseFail error state2))
     (mkFn2 \state2 value -> Done (ParseSucc value state2))
   where
-  run = case _ of
-    More k -> run (k unit)
-    Done a -> a
+  run = go
+    where
+    go n = case _ of
+      More k ->
+        if n < 1000 then -- set the limit as appropriate
+          go (n + 1) (k unit) -- it's important to use go here
+        else do
+          Aff.delay (20.0 # Milliseconds) -- set the delay as appropriate
+          run 0 (k unit) -- it's important to use run here
+      Done a ->
+        pure a
 
-runParser :: forall a. TokenStream -> Parser a -> Either PositionedError (Tuple a (Array PositionedError))
-runParser stream = fromParserResult <<< runParser' (initialParserState stream)
+runParser :: forall a. TokenStream -> Parser a -> Aff (Either PositionedError (Tuple a (Array PositionedError)))
+runParser stream = map fromParserResult <<< runParser' (initialParserState stream)
 
 data ParserResult a
   = ParseFail PositionedError ParserState

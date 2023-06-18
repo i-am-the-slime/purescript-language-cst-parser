@@ -1,11 +1,16 @@
 { name = "language-cst-parser"
 , license = "MIT"
-, repository = "https://github.com/natefaubion/purescript-language-cst-parser.git"
+, repository =
+    "https://github.com/natefaubion/purescript-language-cst-parser.git"
 , dependencies =
-  [ "arrays"
+  [ "aff"
+  , "argonaut"
+  , "argonaut-generic"
+  , "arrays"
   , "console"
   , "const"
   , "control"
+  , "datetime"
   , "effect"
   , "either"
   , "enums"

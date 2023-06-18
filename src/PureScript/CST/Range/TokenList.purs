@@ -25,6 +25,7 @@ import Data.Tuple (Tuple(..))
 import Data.Unfoldable (class Unfoldable, unfoldr)
 import Partial.Unsafe (unsafePartial)
 import PureScript.CST.Types (SourceToken)
+import Data.Generic.Rep (class Generic)
 
 data TokenList
   = TokenEmpty
@@ -33,6 +34,8 @@ data TokenList
   | TokenAppend TokenList TokenList
   | TokenDefer (Unit -> TokenList)
   | TokenArray Int Int (Array SourceToken)
+
+derive instance Generic TokenList _
 
 instance lazyTokenList :: Lazy TokenList where
   defer = TokenDefer
