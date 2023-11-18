@@ -5,6 +5,7 @@
 , dependencies =
   [ "aff"
   , "argonaut"
+  , "argonaut-codecs"
   , "argonaut-generic"
   , "arrays"
   , "console"

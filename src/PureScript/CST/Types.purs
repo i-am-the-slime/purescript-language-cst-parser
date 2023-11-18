@@ -8,12 +8,22 @@ import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
 import Data.Tuple (Tuple)
 import Prim hiding (Row, Type)
+import Data.Generic.Rep (class Generic)
+import Data.Argonaut.Encode.Class (class EncodeJson)
+import Data.Argonaut.Encode.Generic (genericEncodeJson)
+import Data.Argonaut.Decode.Class (class DecodeJson, class DecodeJsonField)
+import Data.Argonaut.Decode.Generic (genericDecodeJson)
 
 newtype ModuleName = ModuleName String
 
 derive newtype instance eqModuleName :: Eq ModuleName
 derive newtype instance ordModuleName :: Ord ModuleName
 derive instance newtypeModuleName :: Newtype ModuleName _
+derive instance Generic ModuleName _
+instance EncodeJson ModuleName where
+  encodeJson = genericEncodeJson
+instance DecodeJson ModuleName where
+  decodeJson = genericDecodeJson
 
 type SourcePos =
   { line :: Int
@@ -30,15 +40,33 @@ data Comment l
   | Space Int
   | Line l Int
 
+derive instance Generic (Comment l) _
+instance (EncodeJson l) => EncodeJson (Comment l) where
+  encodeJson = genericEncodeJson
+instance (DecodeJson l) => DecodeJson (Comment l) where
+  decodeJson = genericDecodeJson
+
 data LineFeed
   = LF
   | CRLF
+
+derive instance Generic LineFeed _
+instance EncodeJson LineFeed where
+  encodeJson = genericEncodeJson
+instance DecodeJson LineFeed where
+  decodeJson = genericDecodeJson
 
 data SourceStyle
   = ASCII
   | Unicode
 
+
 derive instance eqSourceStyle :: Eq SourceStyle
+derive instance Generic SourceStyle _
+instance EncodeJson SourceStyle where
+  encodeJson = genericEncodeJson
+instance DecodeJson SourceStyle where
+  decodeJson = genericDecodeJson
 
 data IntValue
   = SmallInt Int
@@ -46,6 +74,11 @@ data IntValue
   | BigHex String
 
 derive instance eqIntValue :: Eq IntValue
+derive instance Generic IntValue _
+instance EncodeJson IntValue where
+  encodeJson = genericEncodeJson
+instance DecodeJson IntValue where
+  decodeJson = genericDecodeJson
 
 data Token
   = TokLeftParen
@@ -83,6 +116,11 @@ data Token
   | TokLayoutEnd Int
 
 derive instance eqToken :: Eq Token
+derive instance Generic Token _
+instance EncodeJson Token where
+  encodeJson = genericEncodeJson
+instance DecodeJson Token where
+  decodeJson = genericDecodeJson
 
 type SourceToken =
   { range :: SourceRange
@@ -96,24 +134,32 @@ newtype Ident = Ident String
 derive newtype instance eqIdent :: Eq Ident
 derive newtype instance ordIdent :: Ord Ident
 derive instance newtypeIdent :: Newtype Ident _
+derive newtype instance EncodeJson Ident
+derive newtype instance DecodeJson Ident
 
 newtype Proper = Proper String
 
 derive newtype instance eqProper :: Eq Proper
 derive newtype instance ordProper :: Ord Proper
 derive instance newtypeProper :: Newtype Proper _
+derive newtype instance EncodeJson Proper
+derive newtype instance DecodeJson Proper
 
 newtype Label = Label String
 
 derive newtype instance eqLabel :: Eq Label
 derive newtype instance ordLabel :: Ord Label
 derive instance newtypeLabel :: Newtype Label _
+derive newtype instance EncodeJson Label
+derive newtype instance DecodeJson Label
 
 newtype Operator = Operator String
 
 derive newtype instance eqOperator :: Eq Operator
 derive newtype instance ordOperator :: Ord Operator
 derive instance newtypeOperator :: Newtype Operator _
+derive newtype instance EncodeJson Operator
+derive newtype instance DecodeJson Operator
 
 newtype Name a = Name
   { token :: SourceToken
@@ -121,6 +167,8 @@ newtype Name a = Name
   }
 
 derive instance newtypeName :: Newtype (Name a) _
+derive newtype instance EncodeJson a => EncodeJson (Name a)
+derive newtype instance DecodeJsonField a => DecodeJson (Name a)
 
 newtype QualifiedName a = QualifiedName
   { token :: SourceToken
@@ -129,6 +177,8 @@ newtype QualifiedName a = QualifiedName
   }
 
 derive instance newtypeQualifiedName :: Newtype (QualifiedName a) _
+derive newtype instance EncodeJson a => EncodeJson (QualifiedName a)
+derive newtype instance DecodeJsonField a => DecodeJson (QualifiedName a)
 
 newtype Wrapped a = Wrapped
   { open :: SourceToken
@@ -137,6 +187,8 @@ newtype Wrapped a = Wrapped
   }
 
 derive instance newtypeWrapped :: Newtype (Wrapped a) _
+derive newtype instance EncodeJson a => EncodeJson (Wrapped a)
+derive newtype instance DecodeJsonField a => DecodeJson (Wrapped a)
 
 newtype Separated a = Separated
   { head :: a
@@ -144,6 +196,8 @@ newtype Separated a = Separated
   }
 
 derive instance newtypeSeparated :: Newtype (Separated a) _
+derive newtype instance EncodeJson a => EncodeJson (Separated a)
+derive newtype instance (DecodeJsonField a, DecodeJson a) => DecodeJson (Separated a)
 
 newtype Labeled a b = Labeled
   { label :: a
@@ -152,6 +206,8 @@ newtype Labeled a b = Labeled
   }
 
 derive instance newtypeLabeled :: Newtype (Labeled a b) _
+derive newtype instance (EncodeJson a, EncodeJson b) => EncodeJson (Labeled a b)
+derive newtype instance (DecodeJsonField a, DecodeJsonField b, DecodeJson a, DecodeJson b) => DecodeJson (Labeled a b)
 
 newtype Prefixed a = Prefixed
   { prefix :: Maybe SourceToken
@@ -159,6 +215,8 @@ newtype Prefixed a = Prefixed
   }
 
 derive instance newtypePrefixed :: Newtype (Prefixed a) _
+derive newtype instance EncodeJson a => EncodeJson (Prefixed a)
+derive newtype instance (DecodeJsonField a, DecodeJson a) => DecodeJson (Prefixed a)
 
 type Delimited a = Wrapped (Maybe (Separated a))
 type DelimitedNonEmpty a = Wrapped (Separated a)
@@ -166,6 +224,12 @@ type DelimitedNonEmpty a = Wrapped (Separated a)
 data OneOrDelimited a
   = One a
   | Many (DelimitedNonEmpty a)
+
+derive instance Generic (OneOrDelimited a) _
+instance (EncodeJson a) => EncodeJson (OneOrDelimited a) where
+  encodeJson x = genericEncodeJson x
+instance (DecodeJson a, DecodeJsonField a) => DecodeJson (OneOrDelimited a) where
+  decodeJson x = genericDecodeJson x
 
 data Type e
   = TypeVar (Name Ident)
@@ -187,9 +251,22 @@ data Type e
   | TypeParens (Wrapped (Type e))
   | TypeError e
 
+-- TODO
+derive instance Generic (Type e) _
+instance (EncodeJson e, EncodeJson (Row e)) => EncodeJson (Type e) where
+  encodeJson x = genericEncodeJson x
+instance (DecodeJson e, DecodeJsonField e) => DecodeJson (Type e) where
+  decodeJson x = genericDecodeJson x
+
 data TypeVarBinding a e
   = TypeVarKinded (Wrapped (Labeled a (Type e)))
   | TypeVarName a
+
+derive instance Generic (TypeVarBinding a e) _
+instance (EncodeJson a, EncodeJson e) => EncodeJson (TypeVarBinding a e) where
+  encodeJson x = genericEncodeJson x
+instance (DecodeJson a, DecodeJsonField a, DecodeJson e, DecodeJsonField e) => DecodeJson (TypeVarBinding a e) where
+  decodeJson x = genericDecodeJson x
 
 newtype Row e = Row
   { labels :: Maybe (Separated (Labeled (Name Label) (Type e)))
@@ -197,6 +274,8 @@ newtype Row e = Row
   }
 
 derive instance newtypeRow :: Newtype (Row e) _
+derive newtype instance EncodeJson e => EncodeJson (Row e)
+derive newtype instance (DecodeJsonField e, DecodeJson e) => DecodeJson (Row e)
 
 newtype Module e = Module
   { header :: ModuleHeader e
@@ -231,6 +310,8 @@ data Export e
   | ExportClass SourceToken (Name Proper)
   | ExportModule SourceToken (Name ModuleName)
   | ExportError e
+
+
 
 data DataMembers
   = DataAll SourceToken
@@ -337,6 +418,12 @@ data Guarded e
   = Unconditional SourceToken (Where e)
   | Guarded (NonEmptyArray (GuardedExpr e))
 
+derive instance Generic (Guarded e) _
+instance (EncodeJson e) => EncodeJson (Guarded e) where
+  encodeJson = genericEncodeJson
+instance (DecodeJson e, DecodeJsonField e) => DecodeJson (Guarded e) where
+  decodeJson = genericDecodeJson
+
 newtype GuardedExpr e = GuardedExpr
   { bar :: SourceToken
   , patterns :: Separated (PatternGuard e)
@@ -345,6 +432,8 @@ newtype GuardedExpr e = GuardedExpr
   }
 
 derive instance newtypeGuardedExpr :: Newtype (GuardedExpr e) _
+derive newtype instance EncodeJson e => EncodeJson (GuardedExpr e)
+derive newtype instance (DecodeJsonField e, DecodeJson e) => DecodeJson (GuardedExpr e)
 
 newtype PatternGuard e = PatternGuard
   { binder :: Maybe (Tuple (Binder e) SourceToken)
@@ -352,6 +441,9 @@ newtype PatternGuard e = PatternGuard
   }
 
 derive instance newtypePatternGuard :: Newtype (PatternGuard e) _
+derive newtype instance EncodeJson e => EncodeJson (PatternGuard e)
+derive newtype instance (DecodeJsonField e, DecodeJson e) => DecodeJson (PatternGuard e)
+
 
 data Foreign e
   = ForeignValue (Labeled (Name Ident) (Type e))
@@ -362,6 +454,12 @@ data Role
   = Nominal
   | Representational
   | Phantom
+
+derive instance Generic Role _
+instance EncodeJson Role where
+  encodeJson = genericEncodeJson
+instance DecodeJson Role where
+  decodeJson = genericDecodeJson
 
 data Expr e
   = ExprHole (Name Ident)
@@ -392,17 +490,41 @@ data Expr e
   | ExprAdo (AdoBlock e)
   | ExprError e
 
+derive instance Generic (Expr e) _
+instance (EncodeJson e) => EncodeJson (Expr e) where
+  encodeJson = genericEncodeJson
+instance (DecodeJson e, DecodeJsonField e) => DecodeJson (Expr e) where
+  decodeJson = genericDecodeJson
+
 data AppSpine f e
   = AppType SourceToken (Type e)
   | AppTerm (f e)
+
+derive instance Generic (AppSpine f e) _
+instance (EncodeJson e, EncodeJson (f e)) => EncodeJson (AppSpine f e) where
+  encodeJson = genericEncodeJson
+instance (DecodeJson e, DecodeJsonField e, DecodeJson (f e)) => DecodeJson (AppSpine f e) where
+  decodeJson = genericDecodeJson
 
 data RecordLabeled a
   = RecordPun (Name Ident)
   | RecordField (Name Label) SourceToken a
 
+derive instance Generic (RecordLabeled a) _
+instance (EncodeJson a) => EncodeJson (RecordLabeled a) where
+  encodeJson = genericEncodeJson
+instance (DecodeJson a) => DecodeJson (RecordLabeled a) where
+  decodeJson = genericDecodeJson
+
 data RecordUpdate e
   = RecordUpdateLeaf (Name Label) SourceToken (Expr e)
   | RecordUpdateBranch (Name Label) (DelimitedNonEmpty (RecordUpdate e))
+
+derive instance Generic (RecordUpdate e) _
+instance (EncodeJson e) => EncodeJson (RecordUpdate e) where
+  encodeJson = genericEncodeJson
+instance (DecodeJson e, DecodeJsonField e) => DecodeJson (RecordUpdate e) where
+  decodeJson = genericDecodeJson
 
 type RecordAccessor e =
   { expr :: Expr e
@@ -446,12 +568,20 @@ newtype Where e = Where
   }
 
 derive instance newtypeWhere :: Newtype (Where e) _
+derive newtype instance EncodeJson e => EncodeJson (Where e)
+derive newtype instance (DecodeJsonField e, DecodeJson e) => DecodeJson (Where e)
 
 data LetBinding e
   = LetBindingSignature (Labeled (Name Ident) (Type e))
   | LetBindingName (ValueBindingFields e)
   | LetBindingPattern (Binder e) SourceToken (Where e)
   | LetBindingError e
+
+derive instance Generic (LetBinding e) _
+instance (EncodeJson e) => EncodeJson (LetBinding e) where
+  encodeJson = genericEncodeJson
+instance (DecodeJson e, DecodeJsonField e) => DecodeJson (LetBinding e) where
+  decodeJson = genericDecodeJson
 
 type DoBlock e =
   { keyword :: SourceToken
@@ -463,6 +593,12 @@ data DoStatement e
   | DoDiscard (Expr e)
   | DoBind (Binder e) SourceToken (Expr e)
   | DoError e
+
+derive instance Generic (DoStatement e) _
+instance (EncodeJson e) => EncodeJson (DoStatement e) where
+  encodeJson = genericEncodeJson
+instance (DecodeJson e, DecodeJsonField e) => DecodeJson (DoStatement e) where
+  decodeJson = genericDecodeJson
 
 type AdoBlock e =
   { keyword :: SourceToken
@@ -487,3 +623,9 @@ data Binder e
   | BinderTyped (Binder e) SourceToken (Type e)
   | BinderOp (Binder e) (NonEmptyArray (Tuple (QualifiedName Operator) (Binder e)))
   | BinderError e
+
+derive instance Generic (Binder e) _
+instance (EncodeJson e) => EncodeJson (Binder e) where
+  encodeJson = genericEncodeJson
+instance (DecodeJson e, DecodeJsonField e) => DecodeJson (Binder e) where
+  decodeJson = genericDecodeJson
