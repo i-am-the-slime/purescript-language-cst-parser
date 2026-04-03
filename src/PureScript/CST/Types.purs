@@ -237,9 +237,9 @@ data DataMembers
   | DataEnumerated (Delimited (Name Proper))
 
 data Declaration e
-  = DeclData (DataHead e) (Maybe (Tuple SourceToken (Separated (DataCtor e))))
+  = DeclData (DataHead e) (Maybe (Tuple SourceToken (Separated (DataCtor e)))) (Array (DerivingClause e))
   | DeclType (DataHead e) SourceToken (Type e)
-  | DeclNewtype (DataHead e) SourceToken (Name Proper) (Type e)
+  | DeclNewtype (DataHead e) SourceToken (Name Proper) (Type e) (Array (DerivingClause e))
   | DeclClass (ClassHead e) (Maybe (Tuple SourceToken (NonEmptyArray (Labeled (Name Ident) (Type e)))))
   | DeclInstanceChain (Separated (Instance e))
   | DeclDerive SourceToken (Maybe SourceToken) (InstanceHead e)
@@ -250,6 +250,18 @@ data Declaration e
   | DeclForeign SourceToken SourceToken (Foreign e)
   | DeclRole SourceToken SourceToken (Name Proper) (NonEmptyArray (Tuple SourceToken Role))
   | DeclError e
+
+data DerivingClause e
+  = DerivingClauseStandard SourceToken (DelimitedNonEmpty (DerivingClassHead e))
+  | DerivingClauseNewtype SourceToken SourceToken (DelimitedNonEmpty (DerivingClassHead e))
+  | DerivingClauseVia SourceToken (DelimitedNonEmpty (DerivingClassHead e)) SourceToken (Type e)
+
+newtype DerivingClassHead e = DerivingClassHead
+  { className :: QualifiedName Proper
+  , args :: Array (Type e)
+  }
+
+derive instance newtypeDerivingClassHead :: Newtype (DerivingClassHead e) _
 
 newtype Instance e = Instance
   { head :: InstanceHead e

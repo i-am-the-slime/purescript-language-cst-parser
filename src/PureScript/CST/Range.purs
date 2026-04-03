@@ -18,7 +18,7 @@ import Data.Tuple (Tuple(..), fst, snd)
 import PureScript.CST.Errors (RecoveredError(..))
 import PureScript.CST.Range.TokenList (TokenList, cons, singleton)
 import PureScript.CST.Range.TokenList as TokenList
-import PureScript.CST.Types (AppSpine(..), Binder(..), ClassFundep(..), DataCtor(..), DataMembers(..), Declaration(..), DoStatement(..), Export(..), Expr(..), FixityOp(..), Foreign(..), Guarded(..), GuardedExpr(..), Import(..), ImportDecl(..), Instance(..), InstanceBinding(..), Labeled(..), LetBinding(..), Module(..), ModuleBody(..), ModuleHeader(..), Name(..), OneOrDelimited(..), PatternGuard(..), Prefixed(..), QualifiedName(..), RecordLabeled(..), RecordUpdate(..), Row(..), Separated(..), SourceRange, Type(..), TypeVarBinding(..), Where(..), Wrapped(..))
+import PureScript.CST.Types (AppSpine(..), Binder(..), ClassFundep(..), DataCtor(..), DataMembers(..), Declaration(..), DerivingClassHead(..), DerivingClause(..), DoStatement(..), Export(..), Expr(..), FixityOp(..), Foreign(..), Guarded(..), GuardedExpr(..), Import(..), ImportDecl(..), Instance(..), InstanceBinding(..), Labeled(..), LetBinding(..), Module(..), ModuleBody(..), ModuleHeader(..), Name(..), OneOrDelimited(..), PatternGuard(..), Prefixed(..), QualifiedName(..), RecordLabeled(..), RecordUpdate(..), Row(..), Separated(..), SourceRange, Type(..), TypeVarBinding(..), Where(..), Wrapped(..))
 
 class RangeOf a where
   rangeOf :: a -> SourceRange
@@ -411,19 +411,62 @@ instance tokensOfDataCtor :: TokensOf e => TokensOf (DataCtor e) where
   tokensOf (DataCtor { name, fields }) =
     tokensOf name <> tokensOf fields
 
+instance rangeOfDerivingClassHead :: RangeOf e => RangeOf (DerivingClassHead e) where
+  rangeOf (DerivingClassHead { className, args }) = do
+    let
+      { end } = case Array.last args of
+        Nothing -> rangeOf className
+        Just ty -> rangeOf ty
+    { start: (rangeOf className).start
+    , end
+    }
+
+instance tokensOfDerivingClassHead :: TokensOf e => TokensOf (DerivingClassHead e) where
+  tokensOf (DerivingClassHead { className, args }) =
+    tokensOf className <> tokensOf args
+
+instance rangeOfDerivingClause :: RangeOf e => RangeOf (DerivingClause e) where
+  rangeOf = case _ of
+    DerivingClauseStandard kw classes ->
+      { start: kw.range.start
+      , end: (rangeOf classes).end
+      }
+    DerivingClauseNewtype kw _ classes ->
+      { start: kw.range.start
+      , end: (rangeOf classes).end
+      }
+    DerivingClauseVia kw _ _ viaTy ->
+      { start: kw.range.start
+      , end: (rangeOf viaTy).end
+      }
+
+instance tokensOfDerivingClause :: TokensOf e => TokensOf (DerivingClause e) where
+  tokensOf = case _ of
+    DerivingClauseStandard kw classes ->
+      cons kw $ defer \_ -> tokensOf classes
+    DerivingClauseNewtype kw nt classes ->
+      cons kw $ defer \_ -> singleton nt <> tokensOf classes
+    DerivingClauseVia kw classes viaTok viaTy ->
+      cons kw $ defer \_ ->
+        tokensOf classes
+          <> singleton viaTok
+          <> tokensOf viaTy
+
 instance rangeOfDecl :: RangeOf e => RangeOf (Declaration e) where
   rangeOf = case _ of
-    DeclData { keyword, name, vars } ctors -> do
+    DeclData { keyword, name, vars } ctors derivs -> do
       let
-        { end } = case ctors of
-          Nothing ->
-            case Array.last vars of
-              Nothing ->
-                rangeOf name
-              Just var ->
-                rangeOf var
-          Just (Tuple _ (Separated { head, tail })) ->
-            rangeOf $ maybe head snd $ Array.last tail
+        { end } = case Array.last derivs of
+          Just d -> rangeOf d
+          Nothing -> case ctors of
+            Nothing ->
+              case Array.last vars of
+                Nothing ->
+                  rangeOf name
+                Just var ->
+                  rangeOf var
+            Just (Tuple _ (Separated { head, tail })) ->
+              rangeOf $ maybe head snd $ Array.last tail
       { start: keyword.range.start
       , end
       }
@@ -431,9 +474,11 @@ instance rangeOfDecl :: RangeOf e => RangeOf (Declaration e) where
       { start: keyword.range.start
       , end: (rangeOf ty).end
       }
-    DeclNewtype { keyword } _ _ ty ->
+    DeclNewtype { keyword } _ _ ty derivs ->
       { start: keyword.range.start
-      , end: (rangeOf ty).end
+      , end: case Array.last derivs of
+          Just d -> (rangeOf d).end
+          Nothing -> (rangeOf ty).end
       }
     DeclClass { keyword, name, vars, fundeps } members -> do
       let
@@ -492,24 +537,26 @@ instance rangeOfDecl :: RangeOf e => RangeOf (Declaration e) where
 
 instance tokensOfDecl :: TokensOf e => TokensOf (Declaration e) where
   tokensOf = case _ of
-    DeclData { keyword, name, vars } ctors ->
+    DeclData { keyword, name, vars } ctors derivs ->
       cons keyword $ defer \_ ->
         tokensOf name
           <> tokensOf vars
           <> foldMap (\(Tuple t cs) -> cons t $ tokensOf cs) ctors
+          <> tokensOf derivs
     DeclType { keyword, name, vars } tok ty ->
       cons keyword $ defer \_ ->
         tokensOf name
           <> tokensOf vars
           <> singleton tok
           <> tokensOf ty
-    DeclNewtype { keyword, name, vars } tok n ty ->
+    DeclNewtype { keyword, name, vars } tok n ty derivs ->
       cons keyword $ defer \_ ->
         tokensOf name
           <> tokensOf vars
           <> singleton tok
           <> tokensOf n
           <> tokensOf ty
+          <> tokensOf derivs
     DeclClass { keyword, super, name, vars, fundeps } members ->
       cons keyword $ defer \_ ->
         foldMap (\(Tuple cs t) -> tokensOf cs <> singleton t) super
