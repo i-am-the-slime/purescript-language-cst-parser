@@ -50,8 +50,8 @@ module PureScript.CST.Traversal
   , traverseForeign
   , traverseInstance
   , traverseInstanceHead
-  , traverseDerivingClause
-  , traverseDerivingClassHead
+  , traverseDeriveClause
+  , traverseDeriveClassHead
   , traverseInstanceBinding
   , traverseClassHead
   , traverseOneOrDelimited
@@ -113,7 +113,7 @@ import Data.Newtype (un)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), curry, uncurry)
 import Prim as P
-import PureScript.CST.Types (AdoBlock, AppSpine(..), Binder(..), CaseOf, ClassHead, DataCtor(..), DataHead, Declaration(..), Delimited, DelimitedNonEmpty, DerivingClassHead(..), DerivingClause(..), DoBlock, DoStatement(..), Expr(..), Foreign(..), Guarded(..), GuardedExpr(..), IfThenElse, Instance(..), InstanceBinding(..), InstanceHead, Labeled(..), Lambda, LetBinding(..), LetIn, Module(..), ModuleBody(..), OneOrDelimited(..), PatternGuard(..), RecordAccessor, RecordLabeled(..), RecordUpdate(..), Row(..), Separated(..), Type(..), TypeVarBinding(..), ValueBindingFields, Where(..), Wrapped(..))
+import PureScript.CST.Types (AdoBlock, AppSpine(..), Binder(..), CaseOf, ClassHead, DataCtor(..), DataHead, Declaration(..), Delimited, DelimitedNonEmpty, DeriveClassHead(..), DeriveClause(..), DoBlock, DoStatement(..), Expr(..), Foreign(..), Guarded(..), GuardedExpr(..), IfThenElse, Instance(..), InstanceBinding(..), InstanceHead, Labeled(..), Lambda, LetBinding(..), LetIn, Module(..), ModuleBody(..), OneOrDelimited(..), PatternGuard(..), RecordAccessor, RecordLabeled(..), RecordUpdate(..), Row(..), Separated(..), Type(..), TypeVarBinding(..), ValueBindingFields, Where(..), Wrapped(..))
 import Type.Row (type (+))
 
 type Rewrite e f (g :: P.Type -> P.Type) = g e -> f (g e)
@@ -199,9 +199,9 @@ traverseDecl
   => { | OnBinder (Rewrite e f) + OnDecl (Rewrite e f) + OnExpr (Rewrite e f) + OnType (Rewrite e f) + r }
   -> Rewrite e f Declaration
 traverseDecl k = case _ of
-  DeclData binding ctors derivs -> DeclData <$> traverseDataHead k binding <*> traverse (traverse (traverseSeparated (traverseDataCtor k))) ctors <*> traverse (traverseDerivingClause k) derivs
+  DeclData binding ctors derivs -> DeclData <$> traverseDataHead k binding <*> traverse (traverse (traverseSeparated (traverseDataCtor k))) ctors <*> traverse (traverseDeriveClause k) derivs
   DeclType head tok typ -> DeclType <$> traverseDataHead k head <@> tok <*> k.onType typ
-  DeclNewtype head tok name typ derivs -> DeclNewtype <$> traverseDataHead k head <@> tok <@> name <*> k.onType typ <*> traverse (traverseDerivingClause k) derivs
+  DeclNewtype head tok name typ derivs -> DeclNewtype <$> traverseDataHead k head <@> tok <@> name <*> k.onType typ <*> traverse (traverseDeriveClause k) derivs
   DeclClass head sig -> DeclClass <$> traverseClassHead k head <*> traverse (traverse (traverse (traverseLabeled k.onType))) sig
   DeclInstanceChain instances -> DeclInstanceChain <$> traverseSeparated (traverseInstance k) instances
   DeclDerive tok mbTok head -> DeclDerive tok mbTok <$> traverseInstanceHead k head
@@ -241,26 +241,26 @@ traverseInstanceHead k head =
     <$> traverse (ltraverse (traverseOneOrDelimited k.onType)) head.constraints
     <*> traverse k.onType head.types
 
-traverseDerivingClause
+traverseDeriveClause
   :: forall e f r
    . Applicative f
   => { | OnType (Rewrite e f) + r }
-  -> Rewrite e f DerivingClause
-traverseDerivingClause k = case _ of
-  DerivingClauseStandard tok classes ->
-    DerivingClauseStandard tok <$> traverseDelimitedNonEmpty (traverseDerivingClassHead k) classes
-  DerivingClauseNewtype tok nt classes ->
-    DerivingClauseNewtype tok nt <$> traverseDelimitedNonEmpty (traverseDerivingClassHead k) classes
-  DerivingClauseVia tok classes viaTok viaTy ->
-    DerivingClauseVia tok <$> traverseDelimitedNonEmpty (traverseDerivingClassHead k) classes <@> viaTok <*> k.onType viaTy
+  -> Rewrite e f DeriveClause
+traverseDeriveClause k = case _ of
+  DeriveClauseStandard tok classes ->
+    DeriveClauseStandard tok <$> traverseDelimitedNonEmpty (traverseDeriveClassHead k) classes
+  DeriveClauseNewtype tok nt classes ->
+    DeriveClauseNewtype tok nt <$> traverseDelimitedNonEmpty (traverseDeriveClassHead k) classes
+  DeriveClauseVia tok classes viaTok viaTy ->
+    DeriveClauseVia tok <$> traverseDelimitedNonEmpty (traverseDeriveClassHead k) classes <@> viaTok <*> k.onType viaTy
 
-traverseDerivingClassHead
+traverseDeriveClassHead
   :: forall e f r
    . Applicative f
   => { | OnType (Rewrite e f) + r }
-  -> Rewrite e f DerivingClassHead
-traverseDerivingClassHead k (DerivingClassHead head) =
-  (\args -> DerivingClassHead head { args = args })
+  -> Rewrite e f DeriveClassHead
+traverseDeriveClassHead k (DeriveClassHead head) =
+  (\args -> DeriveClassHead head { args = args })
     <$> traverse k.onType head.args
 
 traverseInstanceBinding

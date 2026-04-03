@@ -28,7 +28,7 @@ import PureScript.CST.Errors (ParseError(..), RecoveredError(..))
 import PureScript.CST.Parser.Monad (Parser, eof, lookAhead, many, optional, recover, take, try)
 import PureScript.CST.TokenStream (TokenStep(..), TokenStream, currentIndentColumn)
 import PureScript.CST.TokenStream as TokenStream
-import PureScript.CST.Types (AppSpine(..), Binder(..), ClassFundep(..), DataCtor(..), DataMembers(..), Declaration(..), Delimited, DerivingClassHead(..), DerivingClause(..), DoStatement(..), Export(..), Expr(..), Fixity(..), FixityOp(..), Foreign(..), Guarded(..), GuardedExpr(..), Ident(..), Import(..), ImportDecl(..), Instance(..), InstanceBinding(..), IntValue(..), Label(..), Labeled(..), LetBinding(..), Module(..), ModuleBody(..), ModuleHeader(..), ModuleName(..), Name(..), OneOrDelimited(..), Operator(..), PatternGuard(..), Prefixed(..), Proper(..), QualifiedName(..), RecordLabeled(..), RecordUpdate(..), Role(..), Row(..), Separated(..), SourceToken, Token(..), Type(..), TypeVarBinding(..), Where(..), Wrapped(..))
+import PureScript.CST.Types (AppSpine(..), Binder(..), ClassFundep(..), DataCtor(..), DataMembers(..), Declaration(..), Delimited, DeriveClassHead(..), DeriveClause(..), DoStatement(..), Export(..), Expr(..), Fixity(..), FixityOp(..), Foreign(..), Guarded(..), GuardedExpr(..), Ident(..), Import(..), ImportDecl(..), Instance(..), InstanceBinding(..), IntValue(..), Label(..), Labeled(..), LetBinding(..), Module(..), ModuleBody(..), ModuleHeader(..), ModuleName(..), Name(..), OneOrDelimited(..), Operator(..), PatternGuard(..), Prefixed(..), Proper(..), QualifiedName(..), RecordLabeled(..), RecordUpdate(..), Role(..), Row(..), Separated(..), SourceToken, Token(..), Type(..), TypeVarBinding(..), Where(..), Wrapped(..))
 
 type Recovered :: (P.Type -> P.Type) -> P.Type
 type Recovered f = f RecoveredError
@@ -192,7 +192,7 @@ parseDeclData1 :: SourceToken -> Name Proper -> Parser (Recovered Declaration)
 parseDeclData1 keyword name = do
   vars <- many parseTypeVarBindingPlain
   ctors <- optional (Tuple <$> tokEquals <*> separated tokPipe parseDataCtor)
-  derivs <- many parseDerivingClause
+  derivs <- many parseDeriveClause
   pure $ DeclData { keyword, name, vars } ctors derivs
 
 parseDataCtor :: Parser (Recovered DataCtor)
@@ -214,7 +214,7 @@ parseDeclNewtype1 keyword name = do
   tok <- tokEquals
   wrapper <- parseProper
   body <- parseTypeAtom
-  derivs <- many parseDerivingClause
+  derivs <- many parseDeriveClause
   pure $ DeclNewtype { keyword, name, vars } tok wrapper body derivs
 
 parseDeclType :: Parser (Recovered Declaration)
@@ -340,33 +340,33 @@ parseDeclDerive = do
   types <- many parseTypeAtom
   pure $ DeclDerive derive_ newtype_ { keyword, name, constraints, className, types }
 
-parseDerivingClause :: Parser (Recovered DerivingClause)
-parseDerivingClause = do
+parseDeriveClause :: Parser (Recovered DeriveClause)
+parseDeriveClause = do
   derive_ <- tokKeyword "derive"
-  parseDerivingClauseNewtype derive_
-    <|> parseDerivingClauseStandardOrVia derive_
+  parseDeriveClauseNewtype derive_
+    <|> parseDeriveClauseStandardOrVia derive_
 
-parseDerivingClauseNewtype :: SourceToken -> Parser (Recovered DerivingClause)
-parseDerivingClauseNewtype derive_ = do
+parseDeriveClauseNewtype :: SourceToken -> Parser (Recovered DeriveClause)
+parseDeriveClauseNewtype derive_ = do
   newtype_ <- tokKeyword "newtype"
-  classes <- parens (separated tokComma parseDerivingClassHead)
-  pure $ DerivingClauseNewtype derive_ newtype_ classes
+  classes <- parens (separated tokComma parseDeriveClassHead)
+  pure $ DeriveClauseNewtype derive_ newtype_ classes
 
-parseDerivingClauseStandardOrVia :: SourceToken -> Parser (Recovered DerivingClause)
-parseDerivingClauseStandardOrVia derive_ = do
-  classes <- parens (separated tokComma parseDerivingClassHead)
+parseDeriveClauseStandardOrVia :: SourceToken -> Parser (Recovered DeriveClause)
+parseDeriveClauseStandardOrVia derive_ = do
+  classes <- parens (separated tokComma parseDeriveClassHead)
   via <- optional $ try $ Tuple <$> tokKeyword "via" <*> parseTypeAtom
   case via of
     Just (Tuple viaTok viaTy) ->
-      pure $ DerivingClauseVia derive_ classes viaTok viaTy
+      pure $ DeriveClauseVia derive_ classes viaTok viaTy
     Nothing ->
-      pure $ DerivingClauseStandard derive_ classes
+      pure $ DeriveClauseStandard derive_ classes
 
-parseDerivingClassHead :: Parser (Recovered DerivingClassHead)
-parseDerivingClassHead = do
+parseDeriveClassHead :: Parser (Recovered DeriveClassHead)
+parseDeriveClassHead = do
   className <- parseQualifiedProper
   args <- many parseTypeAtom
-  pure $ DerivingClassHead { className, args }
+  pure $ DeriveClassHead { className, args }
 
 parseDeclValue :: Parser (Recovered Declaration)
 parseDeclValue = do

@@ -18,7 +18,7 @@ import Data.Tuple (Tuple(..), fst, snd)
 import PureScript.CST.Errors (RecoveredError(..))
 import PureScript.CST.Range.TokenList (TokenList, cons, singleton)
 import PureScript.CST.Range.TokenList as TokenList
-import PureScript.CST.Types (AppSpine(..), Binder(..), ClassFundep(..), DataCtor(..), DataMembers(..), Declaration(..), DerivingClassHead(..), DerivingClause(..), DoStatement(..), Export(..), Expr(..), FixityOp(..), Foreign(..), Guarded(..), GuardedExpr(..), Import(..), ImportDecl(..), Instance(..), InstanceBinding(..), Labeled(..), LetBinding(..), Module(..), ModuleBody(..), ModuleHeader(..), Name(..), OneOrDelimited(..), PatternGuard(..), Prefixed(..), QualifiedName(..), RecordLabeled(..), RecordUpdate(..), Row(..), Separated(..), SourceRange, Type(..), TypeVarBinding(..), Where(..), Wrapped(..))
+import PureScript.CST.Types (AppSpine(..), Binder(..), ClassFundep(..), DataCtor(..), DataMembers(..), Declaration(..), DeriveClassHead(..), DeriveClause(..), DoStatement(..), Export(..), Expr(..), FixityOp(..), Foreign(..), Guarded(..), GuardedExpr(..), Import(..), ImportDecl(..), Instance(..), InstanceBinding(..), Labeled(..), LetBinding(..), Module(..), ModuleBody(..), ModuleHeader(..), Name(..), OneOrDelimited(..), PatternGuard(..), Prefixed(..), QualifiedName(..), RecordLabeled(..), RecordUpdate(..), Row(..), Separated(..), SourceRange, Type(..), TypeVarBinding(..), Where(..), Wrapped(..))
 
 class RangeOf a where
   rangeOf :: a -> SourceRange
@@ -411,8 +411,8 @@ instance tokensOfDataCtor :: TokensOf e => TokensOf (DataCtor e) where
   tokensOf (DataCtor { name, fields }) =
     tokensOf name <> tokensOf fields
 
-instance rangeOfDerivingClassHead :: RangeOf e => RangeOf (DerivingClassHead e) where
-  rangeOf (DerivingClassHead { className, args }) = do
+instance rangeOfDeriveClassHead :: RangeOf e => RangeOf (DeriveClassHead e) where
+  rangeOf (DeriveClassHead { className, args }) = do
     let
       { end } = case Array.last args of
         Nothing -> rangeOf className
@@ -421,32 +421,32 @@ instance rangeOfDerivingClassHead :: RangeOf e => RangeOf (DerivingClassHead e) 
     , end
     }
 
-instance tokensOfDerivingClassHead :: TokensOf e => TokensOf (DerivingClassHead e) where
-  tokensOf (DerivingClassHead { className, args }) =
+instance tokensOfDeriveClassHead :: TokensOf e => TokensOf (DeriveClassHead e) where
+  tokensOf (DeriveClassHead { className, args }) =
     tokensOf className <> tokensOf args
 
-instance rangeOfDerivingClause :: RangeOf e => RangeOf (DerivingClause e) where
+instance rangeOfDeriveClause :: RangeOf e => RangeOf (DeriveClause e) where
   rangeOf = case _ of
-    DerivingClauseStandard kw classes ->
+    DeriveClauseStandard kw classes ->
       { start: kw.range.start
       , end: (rangeOf classes).end
       }
-    DerivingClauseNewtype kw _ classes ->
+    DeriveClauseNewtype kw _ classes ->
       { start: kw.range.start
       , end: (rangeOf classes).end
       }
-    DerivingClauseVia kw _ _ viaTy ->
+    DeriveClauseVia kw _ _ viaTy ->
       { start: kw.range.start
       , end: (rangeOf viaTy).end
       }
 
-instance tokensOfDerivingClause :: TokensOf e => TokensOf (DerivingClause e) where
+instance tokensOfDeriveClause :: TokensOf e => TokensOf (DeriveClause e) where
   tokensOf = case _ of
-    DerivingClauseStandard kw classes ->
+    DeriveClauseStandard kw classes ->
       cons kw $ defer \_ -> tokensOf classes
-    DerivingClauseNewtype kw nt classes ->
+    DeriveClauseNewtype kw nt classes ->
       cons kw $ defer \_ -> singleton nt <> tokensOf classes
-    DerivingClauseVia kw classes viaTok viaTy ->
+    DeriveClauseVia kw classes viaTok viaTy ->
       cons kw $ defer \_ ->
         tokensOf classes
           <> singleton viaTok
